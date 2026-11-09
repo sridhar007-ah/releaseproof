@@ -73495,6 +73495,11 @@ function chooseNode(inspection, pkg, root, overrides) {
   }
   return { major: DEFAULT_NODE_MAJOR, source: "default" };
 }
+var EXACT_VERSION_EXAMPLE = {
+  npm: "npm@10.9.2",
+  pnpm: "pnpm@10.9.0",
+  yarn: "yarn@4.6.0"
+};
 function parsePackageManagerField(field) {
   const match = /^(npm|pnpm|yarn)@(\d+)(?:\.[^+\s]*)?(?:\+.*)?$/.exec(field.trim());
   if (!match) {
@@ -73518,6 +73523,12 @@ function chooseManager(inspection, pkg, root, warnings) {
       if (parsed) {
         return parsed;
       }
+      const knownManager = /^(npm|pnpm|yarn)@/.exec(field.trim())?.[1];
+      if (knownManager) {
+        return {
+          unsupported: `package manager "${field}" must name an exact version such as ${EXACT_VERSION_EXAMPLE[knownManager]}`
+        };
+      }
       return {
         unsupported: `package manager "${field}" is not supported (only npm, pnpm and yarn are)`
       };
@@ -73529,7 +73540,7 @@ function chooseManager(inspection, pkg, root, warnings) {
   }
   if (lock.has("pnpm-lock.yaml")) {
     const version = inspection.lockfileDetails.pnpm;
-    const spec = version === "5.4" ? "pnpm@7" : version === "6.0" ? "pnpm@8" : "pnpm@10";
+    const spec = version === "5.3" ? "pnpm@6" : version === "5.4" ? "pnpm@7" : version === "6.0" ? "pnpm@8" : "pnpm@10";
     return { name: "pnpm", spec, source: `pnpm-lock.yaml (lockfileVersion ${version ?? "?"})` };
   }
   if (lock.has("yarn.lock")) {

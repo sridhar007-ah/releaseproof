@@ -688,10 +688,10 @@ describe("planBuild: unknown package managers", () => {
   });
 
   it.each([
-    ["npm@latest", "npm"],
-    ["pnpm@^9", "pnpm"],
-    ["yarn@latest", "yarn"],
-  ])("requires an exact version for known manager %s", (field, knownManager) => {
+    ["npm@latest", "npm@10.9.2"],
+    ["pnpm@^9", "pnpm@10.9.0"],
+    ["yarn@latest", "yarn@4.6.0"],
+  ])("requires an exact version for known manager %s", (field, example) => {
     const result = planBuild({
       inspection: inspection({
         packages: [{ ...single, packageManager: field }],
@@ -700,7 +700,7 @@ describe("planBuild: unknown package managers", () => {
     });
     expect(result).toEqual({
       ok: false,
-      reason: `package manager "${field}" must name an exact version such as ${knownManager}@10.9.2`,
+      reason: `package manager "${field}" must name an exact version such as ${example}`,
     });
   });
 });
