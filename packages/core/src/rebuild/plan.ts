@@ -210,6 +210,13 @@ function chooseManager(
       if (parsed) {
         return parsed;
       }
+      // A known manager with a non-exact version gets a specific message.
+      const knownManager = /^(npm|pnpm|yarn)@/.exec(field.trim())?.[1];
+      if (knownManager) {
+        return {
+          unsupported: `package manager "${field}" must name an exact version such as ${knownManager}@10.9.2`,
+        };
+      }
       // Guessing another tool here fails later in confusing ways (zod uses "nub"); say so.
       return {
         unsupported: `package manager "${field}" is not supported (only npm, pnpm and yarn are)`,
@@ -222,7 +229,14 @@ function chooseManager(
   }
   if (lock.has("pnpm-lock.yaml")) {
     const version = inspection.lockfileDetails.pnpm;
-    const spec = version === "5.4" ? "pnpm@7" : version === "6.0" ? "pnpm@8" : "pnpm@10";
+    const spec =
+      version === "5.3"
+        ? "pnpm@6"
+        : version === "5.4"
+          ? "pnpm@7"
+          : version === "6.0"
+            ? "pnpm@8"
+            : "pnpm@10";
     return { name: "pnpm", spec, source: `pnpm-lock.yaml (lockfileVersion ${version ?? "?"})` };
   }
   if (lock.has("yarn.lock")) {

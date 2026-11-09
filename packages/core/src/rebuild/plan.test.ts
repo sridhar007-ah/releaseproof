@@ -589,6 +589,89 @@ describe("planBuild: Lerna repositories without npm workspaces", () => {
   });
 });
 
+describe("planBuild: package manager detection table", () => {
+  it.each([
+    ["npm@10.9.2", "npm", "npm@10.9.2", "packageManager field"],
+    ["pnpm@9.15.0+sha512.x", "pnpm", "pnpm@9.15.0", "packageManager field"],
+    ["yarn@1.22.22", "yarn-classic", "yarn@1.22.22", "packageManager field"],
+    ["yarn@4.6.0", "yarn-berry", "yarn@4.6.0", "packageManager field"],
+  ])("detects manager from packageManager field %s", (field, name, spec, source) => {
+    const result = plan(inspection({ packages: [{ ...single, packageManager: field }] }));
+    expect(result.manager).toEqual({ name, spec, source });
+  });
+
+  it.each([
+    ["5.3", "pnpm@6"],
+    ["5.4", "pnpm@7"],
+    ["6.0", "pnpm@8"],
+    ["9.0", "pnpm@10"],
+  ])("detects pnpm from lockfileVersion %s", (version, spec) => {
+    const result = plan(
+      inspection({
+        packages: [single],
+        lockfiles: ["pnpm-lock.yaml"],
+        lockfileDetails: { pnpm: version },
+      }),
+    );
+    expect(result.manager).toEqual({
+      name: "pnpm",
+      spec,
+      source: `pnpm-lock.yaml (lockfileVersion ${version})`,
+    });
+  });
+
+  it("detects Berry yarn.lock", () => {
+    const result = plan(
+      inspection({
+        packages: [single],
+        lockfiles: ["yarn.lock"],
+        lockfileDetails: { yarnBerry: true },
+      }),
+    );
+    expect(result.manager).toEqual({
+      name: "yarn-berry",
+      spec: "yarn@4",
+      source: "yarn.lock (Berry format)",
+    });
+  });
+
+  it("detects classic yarn.lock", () => {
+    const result = plan(
+      inspection({
+        packages: [single],
+        lockfiles: ["yarn.lock"],
+        lockfileDetails: { yarnBerry: false },
+      }),
+    );
+    expect(result.manager).toEqual({
+      name: "yarn-classic",
+      spec: "yarn@1",
+      source: "yarn.lock (classic format)",
+    });
+  });
+
+  it("detects package-lock.json", () => {
+    const result = plan(inspection({ packages: [single], lockfiles: ["package-lock.json"] }));
+    expect(result.manager).toEqual({
+      name: "npm",
+      spec: undefined,
+      source: "package-lock.json",
+    });
+  });
+
+  it("falls back to npm with a warning when there is no lockfile", () => {
+    const result = plan(inspection({ packages: [single] }));
+    expect(result.manager).toEqual({
+      name: "npm",
+      spec: undefined,
+      source: "default (no lockfile)",
+    });
+    expect(result.warnings).toContain(
+      "no lockfile found: dependency versions are not pinned, so the rebuild may drift",
+    );
+  });
+});
+
 describe("planBuild: unknown package managers", () => {
   it("refuses a packageManager field it cannot run instead of guessing another tool", () => {
     const result = planBuild({
@@ -601,6 +684,23 @@ describe("planBuild: unknown package managers", () => {
     expect(result).toEqual({
       ok: false,
       reason: 'package manager "nub@0.8.3" is not supported (only npm, pnpm and yarn are)',
+    });
+  });
+
+  it.each([
+    ["npm@latest", "npm"],
+    ["pnpm@^9", "pnpm"],
+    ["yarn@latest", "yarn"],
+  ])("requires an exact version for known manager %s", (field, knownManager) => {
+    const result = planBuild({
+      inspection: inspection({
+        packages: [{ ...single, packageManager: field }],
+      }),
+      target: { name: "tiny", version: "1.0.0" },
+    });
+    expect(result).toEqual({
+      ok: false,
+      reason: `package manager "${field}" must name an exact version such as ${knownManager}@10.9.2`,
     });
   });
 });
